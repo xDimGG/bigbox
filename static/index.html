@@ -8,8 +8,48 @@
 <body>
 	<form action="/files" method="post" enctype="multipart/form-data">
 		<input type="file" name="file" id="file">
+		<input type="hidden" name="token" id="token">
 		<br>
 		<input type="submit" value="Go">
 	</form>
+
+	<button id="signin">Sign In</button>
+
+	<script type="module">
+		// Import the functions you need from the SDKs you need
+		import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js';
+		import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js';
+
+		// Your web app's Firebase configuration
+		// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+		const firebaseConfig = {
+			apiKey: 'AIzaSyDgdYkUpixss87VF6DbAKle4LKQG_eXs_k',
+			authDomain: 'bigbox-34654.firebaseapp.com',
+			projectId: 'bigbox-34654',
+			storageBucket: 'bigbox-34654.appspot.com',
+			messagingSenderId: '441356283577',
+			appId: '1:441356283577:web:cce7891fec089402bbb568',
+			measurementId: 'G-361PPX2KVD'
+		};
+
+		// Initialize Firebase
+		const app = initializeApp(firebaseConfig);
+		const auth = getAuth(app);
+
+		auth.onAuthStateChanged(u => {
+			console.log(u);
+			if (u) {
+				document.querySelector('#token').value = u.accessToken;
+			} else {
+				signInAnonymously(auth);
+			}
+		});
+
+		const provider = new GoogleAuthProvider();
+
+		document.querySelector('#signin').onclick = () => signInWithPopup(auth, provider);
+
+		window.auth = auth;
+	</script>
 </body>
 </html>
