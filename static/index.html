@@ -3,53 +3,27 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+	<title>BigBox File Storage</title>
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-	<form action="/files" method="post" enctype="multipart/form-data">
-		<input type="file" name="file" id="file">
-		<input type="hidden" name="token" id="token">
-		<br>
-		<input type="submit" value="Go">
-	</form>
+	<div class="profile" onclick="signInOrOut()">
+		<span id="name"></span>
+		<span id="subtext"></span>
+	</div>
 
-	<button id="signin">Sign In</button>
+	<div class="main">
+		<label for="upload" id="upload-label">
+			<div><svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24"><path d="M10 18v-10h-2.51l4.51-5.01 4.51 5.01h-2.51v10h-4zm-2 2h8v-10h5l-9-10-9 10h5v10zm11-1v3h-14v-3h-2v5h18v-5h-2z"/></svg></div>
+			<input type="file" name="upload" id="upload" multiple>
+		</label>
+		<div id="files"></div>
+	</div>
 
-	<script type="module">
-		// Import the functions you need from the SDKs you need
-		import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js';
-		import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js';
-
-		// Your web app's Firebase configuration
-		// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-		const firebaseConfig = {
-			apiKey: 'AIzaSyDgdYkUpixss87VF6DbAKle4LKQG_eXs_k',
-			authDomain: 'bigbox-34654.firebaseapp.com',
-			projectId: 'bigbox-34654',
-			storageBucket: 'bigbox-34654.appspot.com',
-			messagingSenderId: '441356283577',
-			appId: '1:441356283577:web:cce7891fec089402bbb568',
-			measurementId: 'G-361PPX2KVD'
-		};
-
-		// Initialize Firebase
-		const app = initializeApp(firebaseConfig);
-		const auth = getAuth(app);
-
-		auth.onAuthStateChanged(u => {
-			console.log(u);
-			if (u) {
-				document.querySelector('#token').value = u.accessToken;
-			} else {
-				signInAnonymously(auth);
-			}
-		});
-
-		const provider = new GoogleAuthProvider();
-
-		document.querySelector('#signin').onclick = () => signInWithPopup(auth, provider);
-
-		window.auth = auth;
-	</script>
+	<script type="module" src="/index.js"></script>
 </body>
 </html>

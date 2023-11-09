@@ -104,7 +104,12 @@ func main() {
 		}
 
 		files := make([]File, 0)
-		if err := db.Model(&files).Where("user_id = ?", authToken.UID).Offset(p * ITEMS).Limit(ITEMS).Select(); err != nil {
+		if err := db.Model(&files).
+			Where("user_id = ?", authToken.UID).
+			Order("created_at DESC").
+			Offset(p * ITEMS).
+			Limit(ITEMS).
+			Select(); err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -162,7 +167,7 @@ func main() {
 	})
 
 	r.POST("/files", func(c *gin.Context) {
-		authToken, err := client.VerifyIDToken(context.Background(), c.Request.FormValue("token"))
+		authToken, err := client.VerifyIDToken(context.Background(), c.GetHeader("Authorization"))
 		if err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return

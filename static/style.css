@@ -1,0 +1,112 @@
+* {
+	font-family: 'Roboto', sans-serif;
+}
+
+body {
+	margin: 0;
+}
+
+.profile {
+	position: fixed;
+	top: 0;
+	left: 0;
+	padding: 10px;
+	background-color: #333;
+	cursor: pointer;
+	color: #ccc;
+	border-bottom-right-radius: 5px;
+}
+
+.profile:hover {
+	color: #fff;
+}
+
+#name {
+	color: #fff;
+}
+
+.main {
+	width: 80%;
+	max-width: 480px;
+	margin: 50px auto;
+	display: flex;
+	align-items: center;
+	flex-direction: column;
+}
+
+@media (max-width: 480px) {
+	.main {
+		width: 95%;
+	}
+}
+
+#upload {
+  position: absolute;
+  left: 0;
+  opacity: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+	cursor: pointer;
+}
+
+#upload-label div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ccc;
+  border: 3px dotted #bebebe;
+  border-radius: 10px;
+}
+
+#upload-label.active div {
+  background: #aaa;
+}
+
+#upload-label {
+  display: inline-block;
+  position: relative;
+  height: 300px;
+	width: 100%;
+}
+
+#files {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	padding: 5px 0;
+}
+
+#files div {
+	width: 100%;
+	padding: 0 5px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.name {
+	color: #444;
+	text-decoration: none;
+	height: 100%;
+	width: 100%;
+}
+
+.name:hover {
+	color: #000;
+	text-decoration: underline;
+}
+
+.delete {
+	cursor: pointer;
+	color: #777;
+}
+
+.delete:hover {
+	color: #000;
+}
