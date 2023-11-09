@@ -12,6 +12,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
+	"github.com/go-pg/pg/v10/orm"
 	"github.com/google/uuid"
 )
 
@@ -24,27 +26,44 @@ type File struct {
 	ContentType string `json:"type"`
 }
 
-var db []*File
+var db *pg.DB
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 func main() {
 	r := gin.Default()
+	db = pg.Connect(&pg.Options{
+		User:     "postgres",
+		Password: "epic",
+	})
+	defer db.Close()
+
+	models := []interface{}{
+		(*File)(nil),
+	}
+
+	for _, model := range models {
+		err := db.Model(model).CreateTable(&orm.CreateTableOptions{
+			IfNotExists: true,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	r.Use(static.Serve("/", static.LocalFile("static", false)))
 
 	r.GET("/files/:id", func(c *gin.Context) {
-		for _, file := range db {
-			if file.ID == c.Param("id") {
-				// c.JSON(http.StatusOK, file)
+		file := File{ID: c.Param("id")}
 
-				c.Header("Content-Type", file.ContentType)
-				c.Header("Content-Disposition", "filename=\""+quoteEscaper.Replace(file.Filename)+"\"")
-				c.File(filepath.Join(FILES, file.ID))
-				return
-			}
+		err := db.Model(&file).Select()
+		if err != nil {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
 		}
 
-		c.AbortWithStatus(http.StatusNotFound)
+		c.Header("Content-Type", file.ContentType)
+		c.Header("Content-Disposition", "filename=\""+quoteEscaper.Replace(file.Filename)+"\"")
+		c.File(filepath.Join(FILES, file.ID))
 	})
 
 	r.POST("/files", func(c *gin.Context) {
@@ -89,7 +108,13 @@ func main() {
 			Filename:    s,
 			ContentType: header.Header.Get("Content-Type"),
 		}
-		db = append(db, f)
+
+		_, err = db.Model(f).Insert()
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+
 		c.JSON(http.StatusOK, f)
 	})
 
