@@ -23,6 +23,9 @@ import (
 
 const FILES = "./files"
 
+const POSTGRES_USERNAME = "postgres"
+const POSTGRES_PASSWORD = "password"
+
 // Number of items per page
 const ITEMS = 20
 
@@ -63,8 +66,8 @@ func main() {
 
 	r := gin.Default()
 	db = pg.Connect(&pg.Options{
-		User:     "postgres",
-		Password: "epic",
+		User:     POSTGRES_USERNAME,
+		Password: POSTGRES_PASSWORD,
 	})
 	defer db.Close()
 	db.AddQueryHook(dbLogger{})
