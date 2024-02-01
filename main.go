@@ -3,28 +3,29 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"google.golang.org/api/option"
 )
 
 const FILES = "./files"
-
-const POSTGRES_USERNAME = "postgres"
-const POSTGRES_PASSWORD = "password"
 
 // Number of items per page
 const ITEMS = 20
@@ -36,6 +37,7 @@ type File struct {
 	Size        int64     `json:"size"`
 	Filename    string    `json:"name"`
 	ContentType string    `json:"type"`
+	Location    string    `json:"location"`
 }
 
 var db *pg.DB
@@ -54,30 +56,52 @@ func (d dbLogger) AfterQuery(c context.Context, q *pg.QueryEvent) error {
 }
 
 func main() {
+	// Load env variables from .env
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	bucket := aws.String(os.Getenv("AWS_BUCKET"))
+
+	// Initialize firebase app
 	app, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile("private_keys.json"))
 	if err != nil {
 		panic(err)
 	}
 
+	// Get firebase auth
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		panic(err)
 	}
 
+	// Initialize Amazon S3
+	sess := session.Must(session.NewSession())
+	svc := s3.New(sess)
+	uploader := s3manager.NewUploader(sess)
+
+	// Create router
 	r := gin.Default()
+
+	// Connect to DB
 	db = pg.Connect(&pg.Options{
-		User:     POSTGRES_USERNAME,
-		Password: POSTGRES_PASSWORD,
+		User:     os.Getenv("POSTGRES_USERNAME"),
+		Password: os.Getenv("POSTGRES_PASSWORD"),
 	})
 	defer db.Close()
+
+	// Add logging to DB
 	db.AddQueryHook(dbLogger{})
 
+	// Define DB tables
 	models := []interface{}{
 		(*File)(nil),
 	}
 
+	// Create DB tables
 	for _, model := range models {
-		// db.Model(model).DropTable(&orm.DropTableOptions{IfExists: true})
+		db.Model(model).DropTable(&orm.DropTableOptions{IfExists: true})
 		err := db.Model(model).CreateTable(&orm.CreateTableOptions{
 			IfNotExists: true,
 		})
@@ -86,6 +110,7 @@ func main() {
 		}
 	}
 
+	// Create index for uid
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_id ON files (user_id)`); err != nil {
 		panic(err)
 	}
@@ -134,9 +159,19 @@ func main() {
 			return
 		}
 
-		c.Header("Content-Type", file.ContentType)
-		c.Header("Content-Disposition", "filename=\""+quoteEscaper.Replace(file.Filename)+"\"")
-		c.File(filepath.Join(FILES, file.ID.String()))
+		output, err := svc.GetObject(&s3.GetObjectInput{
+			Bucket: bucket,
+			Key:    aws.String(file.ID.String()),
+		})
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+
+		c.DataFromReader(http.StatusOK, *output.ContentLength, file.ContentType, output.Body, map[string]string{
+			"Content-Security-Policy": "default-src 'none'",
+			"Content-Disposition":     "filename=\"" + quoteEscaper.Replace(file.Filename) + "\"",
+		})
 	})
 
 	r.DELETE("/files/:id", func(c *gin.Context) {
@@ -161,8 +196,16 @@ func main() {
 		if file.UserID == authToken.UID {
 			if _, err := db.Model(&file).WherePK().Delete(); err != nil {
 				c.AbortWithError(http.StatusInternalServerError, err)
-			} else {
-				c.AbortWithStatus(http.StatusNoContent)
+				return
+			}
+
+			c.Status(http.StatusNoContent)
+			_, err = svc.DeleteObject(&s3.DeleteObjectInput{
+				Bucket: bucket,
+				Key:    aws.String(file.ID.String()),
+			})
+			if err != nil {
+				log.Printf("failed to delete object %s: %v", file.ID, err)
 			}
 		} else {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -188,16 +231,15 @@ func main() {
 			return
 		}
 
-		fmt.Println("copying " + header.Filename)
-
 		id := uuid.New()
-		localFile, err := os.Create(filepath.Join(FILES, id.String()))
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
 
-		_, err = io.Copy(localFile, userFile)
+		result, err := uploader.Upload(&s3manager.UploadInput{
+			Bucket:             bucket,
+			Key:                aws.String(id.String()),
+			Body:               userFile,
+			ContentType:        aws.String(header.Header.Get("Content-Type")),
+			ContentDisposition: aws.String("filename=\"" + quoteEscaper.Replace(header.Filename) + "\""),
+		})
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -215,6 +257,7 @@ func main() {
 			Size:        header.Size,
 			Filename:    s,
 			ContentType: header.Header.Get("Content-Type"),
+			Location:    result.Location,
 		}
 
 		_, err = db.Model(&f).Insert()
